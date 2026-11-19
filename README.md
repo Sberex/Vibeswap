@@ -1,6 +1,6 @@
 # Vibeswap
 
-Vibeswap is a Liquid AMM prototype with a SimplicityHL pool covenant and a browser sandbox. The sandbox lets you swap either way, create pools by asset ID and initial deposit ratio, and add or remove liquidity. It persists sandbox positions and balances in your browser. Its sample asset IDs and balances are synthetic. The Humid connection requests a Liquid Testnet session and does not request signing permissions or access wallet funds.
+Vibeswap is a Liquid AMM prototype with a SimplicityHL pool covenant and a browser sandbox. The sandbox lets you swap either way, create pools by asset ID and initial deposit ratio, and add or remove liquidity. It persists sandbox positions and balances in your browser. Its sample asset IDs and balances are synthetic. The Humid connection requests permission to share a Liquid Testnet receiving address and balances. Approved balances appear on Swap alongside the simulated funds. The wallet menu shows the full address and lets you request details again or disconnect.
 
 ```sh
 npm start

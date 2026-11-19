@@ -64,3 +64,12 @@ footer > :first-child { font-weight: 800; }
   main { margin-top: 35px; }
   .card { padding: 16px; }
 }
+
+.wallet-area { justify-self: end; position: relative; }
+.wallet-area [hidden] { display: none; }
+.wallet-area summary { cursor: pointer; list-style: none; }
+.wallet-area summary::-webkit-details-marker { display: none; }
+.wallet-dropdown { position: absolute; z-index: 2; top: calc(100% + 6px); right: 0; width: min(280px, 80vw); padding: 8px; background: white; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px #25357720; }
+.wallet-dropdown p { overflow-wrap: anywhere; margin: 4px 8px 8px; font-size: 12px; color: var(--muted); }
+.wallet-dropdown button { display: block; width: 100%; padding: 8px; text-align: left; background: transparent; border: 0; border-radius: 6px; color: var(--ink); }
+.wallet-dropdown button:hover { background: #eaf0ff; }

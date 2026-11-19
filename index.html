@@ -15,7 +15,17 @@
       <button type="button" data-view="swap" aria-current="page">Swap</button>
       <button type="button" data-view="liquidity">Liquidity</button>
     </nav>
-    <button type="button" class="wallet" id="wallet">Connect Humid</button>
+    <div class="wallet-area">
+      <button type="button" class="wallet" id="wallet">Connect Humid</button>
+      <details id="wallet-menu" hidden>
+        <summary class="wallet"><span id="wallet-label">Humid</span><span aria-hidden="true">▾</span></summary>
+        <div class="wallet-dropdown">
+          <p id="wallet-address" hidden></p>
+          <button type="button" id="wallet-refresh">Request wallet details</button>
+          <button type="button" id="wallet-disconnect">Disconnect wallet</button>
+        </div>
+      </details>
+    </div>
   </header>
   <main>
     <div class="intro">
@@ -29,7 +39,7 @@
           <h2 id="card-title">Swap</h2>
           <button type="button" class="icon-button" id="info-button" aria-label="About this sandbox" title="About this sandbox">ⓘ</button>
         </div>
-        <p id="notice" class="notice" hidden>Sandbox transactions update this browser only. Connecting Humid checks wallet access without requesting signatures or submitting transactions.</p>
+        <p id="notice" class="notice" hidden>Sandbox transactions update this browser only. Humid can share a Liquid Testnet address and balances. Sandbox swaps use simulated funds.</p>
         <div id="fields"></div>
         <dl class="quote" id="quote"></dl>
         <button class="primary" id="submit" type="submit" disabled>Enter an amount</button>

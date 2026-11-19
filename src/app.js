@@ -2,7 +2,7 @@ import {
   DEMO_ASSETS, DEMO_PAIR, LOCKED_LP, SCALE, addLiquidity, createPool, formatAmount,
   pairKey, parseAmount, removeLiquidity, swap,
 } from './amm.js';
-import { connectHumid, disconnectHumid } from './humid.js';
+import { connectHumid, disconnectHumid, readHumidAddress, readHumidBalance } from './humid.js';
 
 const $ = id => document.getElementById(id);
 const storageKey = 'vibeswap-sandbox-v1';
@@ -15,6 +15,7 @@ let selection = defaultPair;
 let ids = [...DEMO_PAIR];
 let action = null;
 let state = initialState();
+let wallet;
 
 function initialState() {
   try {
@@ -130,6 +131,14 @@ function quote() {
       row('Swap fee', '1% · retained in pool');
       const id = pool.assets[direction];
       row('Sandbox balance', formatAmount(balance(id)) + ' ' + token(id).ticker);
+      if (wallet) {
+        const assets = [null, ...pool.assets.filter(asset => !DEMO_PAIR.includes(asset))];
+        for (const asset of assets) {
+          const shared = wallet.balances.get(asset);
+          row(asset ? 'Humid · ' + token(asset).ticker : 'Humid · Testnet L-BTC',
+            shared === undefined ? 'Not shared' : formatAmount(shared));
+        }
+      }
       if (!$('input').value) return;
       const input = parseAmount($('input').value);
       checkBudget([id], [input]);
@@ -239,26 +248,82 @@ $('trade-form').addEventListener('submit', event => {
 
 render();
 
-let wallet;
+function showWallet() {
+  $('wallet').hidden = Boolean(wallet);
+  $('wallet-menu').hidden = !wallet;
+  $('wallet-address').hidden = !wallet?.address;
+  $('wallet-address').textContent = wallet?.address ?? '';
+  const address = wallet?.address;
+  $('wallet-label').textContent = address
+    ? address.slice(0, 10) + '…' + address.slice(-6)
+    : 'Humid connected';
+  $('wallet-label').title = address ?? '';
+  quote();
+}
+
+async function loadWalletDetails() {
+  const current = wallet;
+  const controls = [$('wallet-refresh'), $('wallet-disconnect')];
+  controls.forEach(button => { button.disabled = true; });
+  let unavailable = false;
+  $('status').textContent = 'Approve the sharing requests in Humid.';
+  try {
+    if (!current.address) {
+      try {
+        current.address = await readHumidAddress(current);
+        showWallet();
+      } catch { unavailable = true; }
+    }
+    const assets = [null, ...state.pools[selection].assets.filter(id => !DEMO_PAIR.includes(id))];
+    for (const asset of assets) {
+      current.balances.delete(asset);
+      try {
+        current.balances.set(asset, await readHumidBalance(current, asset));
+      } catch { unavailable = true; }
+      showWallet();
+    }
+    $('status').textContent = unavailable
+      ? 'Some wallet details were not shared. You can request them from the wallet menu.'
+      : 'Wallet details shared. Swaps still use sandbox funds.';
+  } finally {
+    controls.forEach(button => { button.disabled = false; });
+  }
+}
+
 $('wallet').addEventListener('click', async () => {
   const button = $('wallet');
   button.disabled = true;
   try {
-    if (wallet) {
-      await disconnectHumid(wallet);
-      wallet = undefined;
-      button.textContent = 'Connect Humid';
-      $('status').textContent = 'Humid disconnected.';
-    } else {
-      const provider = window.humid;
-      await connectHumid(provider);
-      wallet = provider;
-      button.textContent = 'Disconnect Humid';
-      $('status').textContent = 'Humid testnet account connected. Trades still use sandbox assets.';
-    }
+    const session = await connectHumid(window.humid);
+    wallet = { ...session, address: '', balances: new Map() };
+    showWallet();
+    await loadWalletDetails();
   } catch (error) {
     $('status').textContent = error.message || 'Unable to connect to Humid.';
   } finally {
     button.disabled = false;
+  }
+});
+
+$('wallet-refresh').addEventListener('click', () => {
+  $('wallet-menu').open = false;
+  void loadWalletDetails();
+});
+
+$('wallet-disconnect').addEventListener('click', async () => {
+  $('wallet-disconnect').disabled = true;
+  $('wallet-refresh').disabled = true;
+  try {
+    await disconnectHumid(wallet.provider);
+    wallet = undefined;
+    $('wallet-menu').open = false;
+    showWallet();
+    $('wallet').focus();
+    $('status').textContent = 'Humid disconnected.';
+  } catch (error) {
+    $('status').textContent = error.message || 'Unable to disconnect Humid.';
+  } finally {
+    $('wallet-disconnect').disabled = false;
+    $('wallet-refresh').disabled = false;
   }
 });

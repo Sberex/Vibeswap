@@ -1,0 +1,126 @@
+simc "0.7.2";
+
+// Vibeswap pool transition. Deploy as the sole leaf with an unspendable internal key.
+// The deployment manifest identifies the genesis outpoints and the one-time LP issuance.
+fn not(value: bool) -> bool {
+    match value { true => false, false => true, }
+}
+
+fn subtract(a: u64, b: u64) -> u64 {
+    let (borrow, result): (bool, u64) = jet::subtract_64(a, b);
+    assert!(not(borrow));
+    result
+}
+
+fn add(a: u64, b: u64) -> u64 {
+    let (carry, result): (bool, u64) = jet::add_64(a, b);
+    assert!(not(carry));
+    result
+}
+
+fn less(a: u128, b: u128) -> bool {
+    let (ah, al): (u64, u64) = <u128>::into(a);
+    let (bh, bl): (u64, u64) = <u128>::into(b);
+    match jet::eq_64(ah, bh) {
+        true => jet::lt_64(al, bl),
+        false => jet::lt_64(ah, bh),
+    }
+}
+
+fn bounded(value: u64) -> u64 {
+    assert!(jet::lt_64(0, value));
+    assert!(jet::le_64(value, 100000000000000000));
+    value
+}
+
+fn explicit(pair: (Asset1, Amount1), id: u256) -> u64 {
+    let (asset, value): (Asset1, Amount1) = pair;
+    assert!(jet::eq_256(unwrap_right::<Confidential1>(asset), id));
+    bounded(unwrap_right::<Confidential1>(value))
+}
+
+fn reserve_in(index: u32, origin: u256, script: u256, asset: u256) -> u64 {
+    let (txid, vout): Outpoint = unwrap(jet::input_prev_outpoint(index));
+    assert!(jet::eq_256(txid, origin));
+    assert!(jet::eq_32(vout, index));
+    assert!(jet::eq_256(unwrap(jet::input_script_hash(index)), script));
+    // Elements enforces the one-block relative lock for version 2.
+    assert!(jet::eq_32(unwrap(jet::input_sequence(index)), 1));
+    explicit(unwrap(jet::input_amount(index)), asset)
+}
+
+fn output_amount(index: u32, asset: u256) -> u64 {
+    explicit(unwrap(jet::output_amount(index)), asset)
+}
+
+fn reserve_out(index: u32, script: u256, asset: u256) -> u64 {
+    assert!(jet::eq_256(unwrap(jet::output_script_hash(index)), script));
+    output_amount(index, asset)
+}
+
+fn floor_ratio(q: u64, n: u128, d: u64) {
+    assert!(not(less(n, jet::multiply_64(q, d))));
+    assert!(less(n, jet::multiply_64(add(q, 1), d)));
+}
+
+fn ceil_ratio(q: u64, n: u128, d: u64) {
+    assert!(less(jet::multiply_64(subtract(q, 1), d), n));
+    assert!(not(less(jet::multiply_64(q, d), n)));
+}
+
+fn swap_amount(x: u64, y: u64, new_x: u64, new_y: u64, output_asset: u256) {
+    let input: u64 = bounded(subtract(new_x, x));
+    let output: u64 = bounded(subtract(y, new_y));
+    // Reserve bounds ensure these scaled u64 integers fit.
+    let (_, effective): (u64, u64) = <u128>::into(jet::multiply_64(99, input));
+    let (_, scaled_x): (u64, u64) = <u128>::into(jet::multiply_64(100, x));
+    floor_ratio(output, jet::multiply_64(effective, y), add(scaled_x, effective));
+    assert!(jet::eq_64(output_amount(3, output_asset), output));
+}
+
+fn main() {
+    let asset_a: u256 = param::ASSET_A;
+    let asset_b: u256 = param::ASSET_B;
+    let lp_asset: u256 = param::LP_ASSET;
+    assert!(not(jet::eq_256(asset_a, asset_b)));
+    assert!(not(jet::eq_256(asset_a, lp_asset)));
+    assert!(not(jet::eq_256(asset_b, lp_asset)));
+    assert!(jet::eq_32(jet::version(), 2));
+    let index: u32 = jet::current_index();
+    assert!(jet::lt_32(index, 3));
+    let (origin, _): Outpoint = jet::current_prev_outpoint();
+    let script: u256 = jet::current_script_hash();
+    let a: u64 = reserve_in(0, origin, script, asset_a);
+    let b: u64 = reserve_in(1, origin, script, asset_b);
+    let inventory: u64 = reserve_in(2, origin, script, lp_asset);
+    let new_a: u64 = reserve_out(0, script, asset_a);
+    let new_b: u64 = reserve_out(1, script, asset_b);
+    let new_inventory: u64 = reserve_out(2, script, lp_asset);
+    let supply: u64 = bounded(subtract(1000000000000000, inventory));
+    // Keep at least one share outstanding, including the permanently locked genesis share.
+    let _: u64 = bounded(subtract(1000000000000000, new_inventory));
+
+    match jet::eq_64(inventory, new_inventory) {
+        true => match jet::lt_64(a, new_a) {
+            true => swap_amount(a, b, new_a, new_b, asset_b),
+            false => swap_amount(b, a, new_b, new_a, asset_a),
+        },
+        false => match jet::lt_64(new_inventory, inventory) {
+            true => {
+                let issued: u64 = subtract(inventory, new_inventory);
+                ceil_ratio(subtract(new_a, a), jet::multiply_64(a, issued), supply);
+                ceil_ratio(subtract(new_b, b), jet::multiply_64(b, issued), supply);
+                assert!(jet::eq_64(output_amount(3, lp_asset), issued));
+            },
+            false => {
+                let redeemed: u64 = subtract(new_inventory, inventory);
+                let payout_a: u64 = subtract(a, new_a);
+                let payout_b: u64 = subtract(b, new_b);
+                floor_ratio(payout_a, jet::multiply_64(a, redeemed), supply);
+                floor_ratio(payout_b, jet::multiply_64(b, redeemed), supply);
+                assert!(jet::eq_64(output_amount(3, asset_a), payout_a));
+                assert!(jet::eq_64(output_amount(4, asset_b), payout_b));
+            },
+        },
+    }
+}

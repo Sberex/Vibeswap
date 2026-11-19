@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f9ff">
+  <title>Vibeswap · Liquid AMM</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/src/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Vibeswap home"><span class="brand-mark">≋</span>vibeswap<span class="brand-dot">.</span></a>
+    <nav aria-label="Trade">
+      <button type="button" data-view="swap" aria-current="page">Swap</button>
+      <button type="button" data-view="liquidity">Liquidity</button>
+    </nav>
+    <button type="button" class="wallet" id="wallet">Connect Humid</button>
+  </header>
+  <main>
+    <div class="intro">
+      <div class="tag"><span>◇</span> LIQUID SANDBOX</div>
+      <h1 id="page-title">Swap assets<span>.</span></h1>
+      <p id="page-description">Trade Liquid assets with a fixed 1% swap fee.</p>
+    </div>
+    <section class="card" aria-labelledby="card-title">
+      <form id="trade-form" novalidate>
+        <div class="card-heading">
+          <h2 id="card-title">Swap</h2>
+          <button type="button" class="icon-button" id="info-button" aria-label="About this sandbox" title="About this sandbox">ⓘ</button>
+        </div>
+        <p id="notice" class="notice" hidden>Sandbox transactions update this browser only. Connecting Humid checks wallet access without requesting signatures or submitting transactions.</p>
+        <div id="fields"></div>
+        <dl class="quote" id="quote"></dl>
+        <button class="primary" id="submit" type="submit" disabled>Enter an amount</button>
+        <p class="status" id="status" role="status"></p>
+      </form>
+    </section>
+    <aside class="pool-card" id="pool-summary" aria-live="polite"></aside>
+  </main>
+  <footer><span>vibeswap<span class="brand-dot">.</span></span><span>Sandbox · no real assets</span></footer>
+</body>
+</html>

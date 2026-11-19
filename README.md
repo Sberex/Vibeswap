@@ -1,6 +1,6 @@
 # Vibeswap
 
-Vibeswap is a Liquid AMM prototype with a SimplicityHL pool covenant and a browser sandbox. The sandbox lets you swap either way, create pools by asset ID and initial deposit ratio, and add or remove liquidity. It persists sandbox positions and balances in your browser. Its sample asset IDs and balances are synthetic. The Humid connection requests permission to share a Liquid Testnet receiving address and balances. Approved balances appear on Swap alongside the simulated funds. The wallet menu shows the full address and lets you request details again or disconnect.
+Vibeswap is a Liquid AMM prototype with a SimplicityHL pool covenant and a Liquid Testnet balance interface. Connect Humid to request permission to share a receiving address and the two selected asset balances. The starting pair is Testnet L-BTC (`144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49`) and `38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5`. If you edit the pair in Liquidity, use **Request wallet details** in the wallet menu to refresh the balances. Balances are displayed in units of 100 million atomic units and only held in memory until disconnect or reload. Browser transaction submission is disabled pending live Testnet integration.
 
 ```sh
 npm start
@@ -47,4 +47,4 @@ python -B test/regtest.py
 
 This starts a fresh offline Elements node, issues three test assets, creates a pool, and mines swaps in both directions plus an LP deposit and withdrawal. It also checks that the next transition is rejected until the prior state confirms. You can set `SIMC`, `HAL_SIMPLICITY`, `ELEMENTSD`, and `ELEMENTS_CLI` to use binaries outside `PATH`.
 
-The browser does not discover live pools, construct live PSETs, or submit trades. The Humid session flow was exercised with a mock provider. The covenant has not undergone an independent security audit. The prototype is not intended for real funds.
+The browser still needs canonical Testnet pool discovery, LP issuance and PSET construction, and funded Humid signing and broadcast validation before it can submit a pool action. The Humid session flow was exercised with a mock provider. The covenant has not undergone an independent security audit. The prototype is not intended for real funds.

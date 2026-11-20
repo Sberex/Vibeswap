@@ -81,8 +81,16 @@ def main():
                         "-c", cmr, "-p", KEY)["pset"]
         for index in range(len(OLD)):
             result = call(HAL, "simplicity", "pset", "run", pset, str(index), encoded, "")
+            jets = result["jets"]
+            if len(jets) == 1 and jets[0]["jet"] == "eq_256" and not jets[0]["success"]:
+                raise AssertionError(
+                    f"{name}, input {index}: HAL failed before producing the first "
+                    "equality result. Check the native Simplicity ABI. On Intel macOS, "
+                    "rebuild HAL with simplicity-sys 0.6.2 as described in README.md. "
+                    f"Trace: {jets}"
+                )
             if result["success"] != expected:
-                raise AssertionError(f"{name}, input {index}: {result['jets'][-4:]}")
+                raise AssertionError(f"{name}, input {index}: {jets[-4:]}")
         print(f"PASS {name}")
 
     vector("A to B", (1100, 1820, OLD[2]), [(B, 180)], True)

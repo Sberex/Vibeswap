@@ -4,11 +4,33 @@ Vibeswap is a Liquid Testnet AMM prototype. The browser asks Humid to share bala
 
 ## Run locally
 
-Use Node.js 22+, [`simc` 0.7.2](https://github.com/BlockstreamResearch/SimplicityHL/releases/tag/simplicityhl-0.7.2), and `hal-simplicity` 0.2.0 at revision `9ceb903d`. Install a current Humid extension with `getUTXOs` and `signPset` support and select a funded Liquid Testnet account. Use `SIMC` and `HAL_SIMPLICITY` if the binaries are outside `PATH`. To install the pinned HAL with Rust:
+Use Node.js 22+, [`simc` 0.7.2](https://github.com/BlockstreamResearch/SimplicityHL/releases/tag/simplicityhl-0.7.2), and `hal-simplicity` 0.2.0 at revision `9ceb903d`. Install a current Humid extension with `getUTXOs` and `signPset` support and select a funded Liquid Testnet account. Use `SIMC` and `HAL_SIMPLICITY` if the binaries are outside `PATH`. For Linux, install the pinned HAL with Rust:
 
 ```sh
 cargo install --locked --git https://github.com/BlockstreamResearch/hal-simplicity --rev 9ceb903dd079c081598652faec4ca04cca98dac2
 ```
+
+### HAL on Intel macOS
+
+The original HAL lockfile pins `simplicity-sys` 0.6.0. On x86_64 macOS its Rust bindings use an eight-byte word where Darwin C uses a two-byte `uint_fast16_t`. HAL’s ABI check rejects execution before the first jet. The trace can show a lone `eq_256` with `success: false` and an empty output even though the comparison should return a Boolean. The upstream ABI fix is included in `simplicity-sys` 0.6.2. [Upstream fix](https://github.com/BlockstreamResearch/rust-simplicity/commit/4126e2ebda012e42860394a34832bfb96a096a24)
+
+Keep `simc` 0.7.2 and build the pinned HAL revision with only the `simplicity-sys` dependency updated. Run these commands from the Vibeswap checkout:
+
+```sh
+git clone https://github.com/BlockstreamResearch/hal-simplicity.git ../vibeswap-hal
+git -C ../vibeswap-hal checkout --detach 9ceb903dd079c081598652faec4ca04cca98dac2
+git -C ../vibeswap-hal apply "$PWD/tools/hal-simplicity-0.6.2.lock.patch"
+(
+  cd ../vibeswap-hal
+  cargo build --release --locked --bin hal-simplicity
+)
+export HAL_SIMPLICITY="$(cd ../vibeswap-hal && pwd)/target/release/hal-simplicity"
+python3 -B test/covenant.py
+```
+
+Use this same `HAL_SIMPLICITY` when running `npm start` or the Elements regtest below. Run both covenant and regtest checks before creating a funded Testnet pool.
+
+### Start Vibeswap
 
 ```sh
 npm ci

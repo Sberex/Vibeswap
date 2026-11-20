@@ -39,11 +39,15 @@ const { createInterface } = require('node:readline');
         if (req.method === 'getAddress') return {chainId:chain,address:'tlq1walletmock'};
         if (req.method === 'getBalance') return {chainId:chain,assetId:req.params.assetId,balance:req.params.assetId.endsWith(B)?'702':'100000000'};
         if (req.method === 'getUTXOs') return {chainId:chain,assetId:req.params.assetId,utxos:[{assetId:req.params.assetId}]};
-        if (req.method === 'signPset' && !req.params.broadcast) return {pset:'signed'};
+        if (req.method === 'signPset' && !req.params.broadcast) {
+          if (window.mockHumidSilent) return new Promise(() => {});
+          return {pset:'signed'};
+        }
         throw Error('Unexpected Humid request');
       }};
     },{chain,B});
     const actions = [];
+    let broadcasts = 0;
     let pool = null;
     await page.route('**/api/*', async route => {
       const req=route.request();
@@ -56,6 +60,7 @@ const { createInterface } = require('node:readline');
         return route.fulfill({json:{id:'planned',pset:'unsigned',signInputs:[{index:0}]}});
       }
       if(path==='/api/broadcast') {
+        broadcasts++;
         assert.equal(body.pset,'signed');
         pool={txid:String(actions.length).repeat(64), lp:LP, assets:[A,B], confirmed:true,reserves:['10000000','100000'],shares:'1000000'};
         return route.fulfill({json:{txid:pool.txid}});
@@ -89,7 +94,19 @@ const { createInterface } = require('node:readline');
     await page.getByRole('button',{name:'Reload to reconnect Humid'}).click();
     await page.getByRole('button',{name:'Connect Humid',exact:true}).click();
     await page.getByText('Wallet details shared.',{exact:true}).waitFor();
-    console.log('All four browser actions, TEST precision and Humid popup recovery passed with mocked services.');
+    await page.clock.install();
+    await page.evaluate(() => { window.mockHumidSilent = true; });
+    await page.getByLabel('You pay').fill('0.001');
+    await page.locator('#submit').click();
+    const transactionStatus = page.locator('#transaction-status');
+    await transactionStatus.getByText(/Waiting for Humid/).waitFor();
+    await page.getByRole('button',{name:'Liquidity',exact:true}).click();
+    assert.match(await transactionStatus.textContent(), /Waiting for Humid/);
+    await page.clock.fastForward(240000);
+    await transactionStatus.getByText(/stopped before broadcast/).waitFor();
+    assert.equal(broadcasts, 4);
+    assert.equal(await page.locator('#txid').isHidden(), true);
+    console.log('Browser actions, TEST precision, Humid popup recovery, and signing timeout passed with mocked services.');
   } finally {
     await browser?.close();
     if (server.exitCode === null && server.signalCode === null) {

@@ -18,8 +18,18 @@ let readingWallet = false;
 
 async function api(path, body) {
   const opts = body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {};
-  const response = await fetch('/api/' + path, opts);
-  const result = await response.json();
+  let response;
+  let result;
+  try {
+    response = await fetch('/api/' + path, {
+      ...opts, signal: AbortSignal.timeout(path === 'broadcast' ? 150000 : 30000),
+    });
+    result = await response.json();
+  } catch {
+    throw Error(path === 'broadcast'
+      ? 'Broadcast response unavailable. Check the Testnet explorer before retrying.'
+      : 'Vibeswap server did not return a response for ' + path + '.');
+  }
   if (!response.ok) throw Error(result.error || 'Vibeswap could not complete the request.');
   return result;
 }
@@ -38,12 +48,12 @@ async function refreshPool() {
   quote();
 }
 
-function showWalletError(error, fallback) {
+function showWalletError(error, fallback, status = $('status')) {
   const recovery = popupUnavailable(error);
   $('wallet-reload').hidden = !recovery;
-  $('status').textContent = recovery
+  status.textContent = recovery
     ? 'Humid’s approval window is unavailable. Close any open Humid popup, reload Vibeswap, then try again.'
-    : error.message || fallback;
+    : error?.message || fallback;
 }
 
 
@@ -227,31 +237,40 @@ $('trade-form').addEventListener('submit', async event => {
     amount: $('input').value, second: $('second')?.value, address: wallet.address,
   };
   let prepared;
+  const status = $('transaction-status');
+  const link = $('txid');
+  link.hidden = true;
+  link.removeAttribute('href');
+  link.textContent = '';
+  $('wallet-reload').hidden = true;
   pending = true;
   $('wallet-disconnect').disabled = true;
   $('wallet-refresh').disabled = true;
   quote();
   try {
-    $('status').textContent = 'Approve sharing spendable coins in Humid.';
+    status.textContent = 'Approve sharing spendable coins in Humid.';
     const assets = new Set([TESTNET_PAIR[0]]);
     if (currentAction === 'create' || currentAction === 'add') assets.add(TESTNET_PAIR[1]);
     if (currentAction === 'swap') assets.add(payload.inputAsset);
     if (currentAction === 'remove') assets.add(pool.lp);
     payload.coins = [];
     for (const asset of assets) payload.coins.push(...await readHumidCoins(wallet, asset));
+    status.textContent = 'Preparing the Liquid Testnet transaction…';
     prepared = await api('prepare', payload);
-    $('status').textContent = 'Review and sign the Liquid Testnet transaction in Humid.';
+    status.textContent = 'Waiting for Humid to return the signed PSET. Approve Sign PSET in Humid.';
     const pset = await signHumidPset(wallet, prepared);
-    $('status').textContent = 'Broadcasting to Liquid Testnet…';
+    status.textContent = 'Humid returned the signed PSET. Finalizing and broadcasting to Liquid Testnet…';
     const { txid } = await api('broadcast', { id: prepared.id, pset });
+    if (typeof txid !== 'string' || !/^[a-f0-9]{64}$/.test(txid)) {
+      throw Error('No transaction ID returned. Check the Testnet explorer before retrying.');
+    }
     wallet.balances.clear();
-    const link = $('txid');
     link.href = 'https://blockstream.info/liquidtestnet/tx/' + txid;
     link.textContent = txid;
     link.hidden = false;
-    $('status').textContent = 'Broadcast accepted. Waiting for confirmation.';
+    status.textContent = 'Broadcast accepted. Waiting for confirmation.';
   } catch (error) {
-    showWalletError(error, 'Transaction failed.');
+    showWalletError(error, 'Transaction failed.', status);
   } finally {
     if (prepared) await api('cancel', { id: prepared.id }).catch(() => {});
     await refreshPool();

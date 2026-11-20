@@ -64,11 +64,22 @@ export async function readHumidCoins(session, asset) {
 }
 
 export async function signHumidPset(session, { pset, signInputs }) {
-  const result = await read(session, 'signPset', { pset, signInputs, broadcast: false });
-  if (typeof result?.pset !== 'string' || !result.pset || result.txid) {
-    throw Error('Humid did not return a signed PSET for finalization.');
+  const signing = read(session, 'signPset', { pset, signInputs, broadcast: false });
+  let timer;
+  try {
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(Error(
+        'Humid did not return the signed PSET within four minutes. This attempt stopped before broadcast. Close the Humid prompt before retrying.',
+      )), 240000);
+    });
+    const result = await Promise.race([signing, timeout]);
+    if (typeof result?.pset !== 'string' || !result.pset || result.txid) {
+      throw Error('Humid did not return a signed PSET for finalization.');
+    }
+    return result.pset;
+  } finally {
+    clearTimeout(timer);
   }
-  return result.pset;
 }
 
 export function popupUnavailable(error) {

@@ -21,7 +21,10 @@ createServer(async (request, response) => {
   }
   try {
     const body = await readFile(new URL(route[0], import.meta.url));
-    response.writeHead(200, { 'Content-Type': route[1] + '; charset=utf-8' });
+    response.writeHead(200, {
+      'Content-Type': route[1] + '; charset=utf-8',
+      'Cache-Control': 'no-store',
+    });
     response.end(request.method === 'HEAD' ? undefined : body);
   } catch {
     response.writeHead(500).end('Unable to load application');

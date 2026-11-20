@@ -3,6 +3,7 @@ from decimal import Decimal
 from functools import partial
 import json
 import os
+from pathlib import Path
 import socket
 import subprocess
 import tempfile
@@ -74,7 +75,29 @@ def run_pool(rpc):
             amount = decimal(sats(coin['amount']))
             pset = call(HAL, 'simplicity', 'pset', 'update-input', pset, str(i),
                         '-i', f"{coin['scriptPubKey']}:{coin['asset']}:{amount}", '-c', cmr, '-p', KEY)['pset']
-        pset = rpc('walletprocesspsbt', pset, 'true', 'ALL')['psbt']
+        pset = rpc('walletprocesspsbt', pset, 'false', 'ALL', 'true', 'false')['psbt']
+        signed = rpc('walletprocesspsbt', pset, 'true', 'ALL', 'true', 'false')['psbt']
+        finalized = subprocess.run(
+            ['node', '--input-type=module', '-e', '''
+                import { readFileSync } from 'node:fs';
+                import { Pset } from 'liquidjs-lib';
+                import { acceptWalletSignature } from './lib/transactions.js';
+                const { unsigned, signed, indexes } = JSON.parse(readFileSync(0, 'utf8'));
+                const pset = Pset.fromBase64(unsigned);
+                const signInputs = indexes.map(index => ({ index }));
+                process.stdout.write(acceptWalletSignature({ pset, signInputs }, signed));
+            '''],
+            input=json.dumps({
+                'unsigned': pset,
+                'signed': signed,
+                'indexes': list(range(len(pool_inputs), len(inputs))),
+            }),
+            cwd=Path(__file__).resolve().parents[1],
+            text=True, capture_output=True, check=False, timeout=30,
+        )
+        if finalized.returncode:
+            raise RuntimeError(f"Vibeswap failed to finalize signed wallet inputs: {finalized.stderr}")
+        pset = finalized.stdout
         for i in range(len(pool_inputs)):
             pset = call(HAL, 'simplicity', 'pset', 'finalize', pset, str(i), encoded, '')['pset']
         raw = call(HAL, 'simplicity', 'pset', 'extract', pset)

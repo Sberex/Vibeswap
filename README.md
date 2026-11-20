@@ -1,13 +1,29 @@
 # Vibeswap
 
-Vibeswap is a Liquid AMM prototype with a SimplicityHL pool covenant and a Liquid Testnet balance interface. Connect Humid to request permission to share a receiving address and the two selected asset balances. The starting pair is Testnet L-BTC (`144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49`) and `38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5`. If you edit the pair in Liquidity, use **Request wallet details** in the wallet menu to refresh the balances. Balances are displayed in units of 100 million atomic units and only held in memory until disconnect or reload. Browser transaction submission is disabled pending live Testnet integration.
+Vibeswap is a Liquid Testnet AMM prototype. The browser asks Humid to share balances and UTXOs, then requests a signature on the prepared PSET. The local server completes any covenant inputs and submits the transaction to the Liquid Testnet explorer. The page shows the resulting txid or an error.
+
+## Run locally
+
+Use Node.js 22+, [`simc` 0.7.2](https://github.com/BlockstreamResearch/SimplicityHL/releases/tag/simplicityhl-0.7.2), and `hal-simplicity` 0.2.0 at revision `9ceb903d`. Install a current Humid extension with `getUTXOs` and `signPset` support and select a funded Liquid Testnet account. Use `SIMC` and `HAL_SIMPLICITY` if the binaries are outside `PATH`. To install the pinned HAL with Rust:
 
 ```sh
+cargo install --locked --git https://github.com/BlockstreamResearch/hal-simplicity --rev 9ceb903dd079c081598652faec4ca04cca98dac2
+```
+
+```sh
+npm ci
 npm start
 npm test
 ```
 
-The server binds to port 5173 by default. Set `PORT` to override it. The browser app has no package dependencies.
+Open `http://localhost:5173` in the browser with Humid installed. The default explorer API is `https://blockstream.info/liquidtestnet/api`. Set `VIBESWAP_ESPLORA` to a reachable Liquid Testnet Esplora API if needed. The server checks the network against the Testnet genesis hash. `HOST` and `PORT` override the local bind address. Keep this single-user prototype on loopback when using a funded wallet.
+
+1. Connect Humid and approve the address, balance, spendable-coin, and PSET permissions. If the Humid popup reports a missing confirmation handler, close it, use **Reload to reconnect Humid**, and reconnect.
+2. Choose **Liquidity**. Fund both configured assets and allow 5,000 atomic units of Testnet L-BTC for each transaction. The pair is `144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49` and `38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5`. Testnet funding is available through [the Liquid Testnet faucet](https://liquidtestnet.com/faucet).
+3. Create the pool if none is registered. Review the PSET inputs, payouts, and fee in Humid before signing. Copy the txid and wait for a confirmation, then click **Refresh pool**.
+4. Add liquidity, swap, and remove liquidity, repeating the confirmation and refresh after each action. Use **Request wallet details** in the wallet menu to refresh balances after transactions. The Remove view uses the canonical pool’s LP asset balance. Vibeswap displays TEST with three decimals and tL-BTC and LP shares with eight. Transactions use exact integer atomic units.
+
+The first genesis broadcast by this server becomes its canonical pool and is saved in `.vibeswap-pool.json`. Keep that file or set `VIBESWAP_POOL_GENESIS` to the genesis txid to share an existing pool across installations. `VIBESWAP_POOL_FILE` changes the registry path. The server verifies the registered genesis and follows its on-chain spend lineage. Independent installations need the same genesis anchor to use the same pool.
 
 ## Pool economics
 
@@ -47,4 +63,4 @@ python -B test/regtest.py
 
 This starts a fresh offline Elements node, issues three test assets, creates a pool, and mines swaps in both directions plus an LP deposit and withdrawal. It also checks that the next transition is rejected until the prior state confirms. You can set `SIMC`, `HAL_SIMPLICITY`, `ELEMENTSD`, and `ELEMENTS_CLI` to use binaries outside `PATH`.
 
-The browser still needs canonical Testnet pool discovery, LP issuance and PSET construction, and funded Humid signing and broadcast validation before it can submit a pool action. The Humid session flow was exercised with a mock provider. The covenant has not undergone an independent security audit. The prototype is not intended for real funds.
+Run `npm run test:browser` to check all four browser handoffs and popup recovery against mocked Humid and explorer responses. Set `CHROMIUM_PATH` to your Chromium executable if it is outside `/usr/bin/chromium`. The transaction planner and covenant tests run offline. A real Humid extension with a funded Testnet account is required for browser acceptance. The covenant has not undergone an independent security audit. Use Testnet assets only.

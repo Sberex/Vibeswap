@@ -8,15 +8,18 @@ export const DEMO_ASSETS = [
 ];
 export const DEMO_PAIR = DEMO_ASSETS.map(asset => asset.id);
 
-export function parseAmount(value) {
-  if (!/^\d{1,10}(\.\d{0,8})?$/.test(value)) throw Error('Enter an amount with up to 8 decimal places.');
+export function parseAmount(value, precision = 8) {
+  if (typeof value !== 'string' || !/^\d{1,18}(\.\d*)?$/.test(value)) throw Error('Enter a valid amount.');
   const [whole, fraction = ''] = value.split('.');
-  return amount(BigInt(whole) * SCALE + BigInt(fraction.padEnd(8, '0')));
+  if (fraction.length > precision) throw Error('Enter an amount with up to ' + precision + ' decimal places.');
+  const scale = 10n ** BigInt(precision);
+  return amount(BigInt(whole) * scale + BigInt(fraction.padEnd(precision, '0') || '0'));
 }
 
-export function formatAmount(value) {
-  const fraction = String(value % SCALE).padStart(8, '0').replace(/0+$/, '');
-  return String(value / SCALE) + (fraction ? '.' + fraction : '');
+export function formatAmount(value, precision = 8) {
+  const scale = 10n ** BigInt(precision);
+  const fraction = String(value % scale).padStart(precision, '0').replace(/0+$/, '');
+  return String(value / scale) + (fraction ? '.' + fraction : '');
 }
 
 export function assetId(value) {

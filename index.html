@@ -39,11 +39,16 @@
           <h2 id="card-title">Swap</h2>
           <button type="button" class="icon-button" id="info-button" aria-label="About Liquid Testnet access" title="About Liquid Testnet access">ⓘ</button>
         </div>
-        <p id="notice" class="notice" hidden>Humid shares your Liquid Testnet address and balances after approval. Use the wallet menu to request balances for an edited pair.</p>
+        <p id="notice" class="notice" hidden>Humid shares your Liquid Testnet address and balances after approval. Refresh the pool after a transaction confirms. Change is sent to your confidential address, and covenant payouts are explicit.</p>
         <div id="fields"></div>
         <dl class="quote" id="quote"></dl>
         <button class="primary" id="submit" type="submit" disabled>Testnet transactions unavailable</button>
         <p class="status" id="status" role="status"></p>
+        <a id="txid" class="txid" target="_blank" rel="noopener noreferrer" hidden></a>
+        <div class="pool-controls">
+          <button type="button" id="pool-refresh">Refresh pool</button>
+          <button type="button" id="wallet-reload" hidden>Reload to reconnect Humid</button>
+        </div>
       </form>
     </section>
 

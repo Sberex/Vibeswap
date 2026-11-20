@@ -73,3 +73,6 @@ footer > :first-child { font-weight: 800; }
 .wallet-dropdown p { overflow-wrap: anywhere; margin: 4px 8px 8px; font-size: 12px; color: var(--muted); }
 .wallet-dropdown button { display: block; width: 100%; padding: 8px; text-align: left; background: transparent; border: 0; border-radius: 6px; color: var(--ink); }
 .wallet-dropdown button:hover { background: #eaf0ff; }
+.txid { overflow-wrap: anywhere; color: var(--blue); font-size: 12px; }
+.pool-controls { display: flex; gap: 8px; margin-top: 12px; }
+.pool-controls button { background: white; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; color: var(--muted); }

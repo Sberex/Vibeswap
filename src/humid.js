@@ -1,4 +1,4 @@
-const TESTNET = 'bip122:a771da8e52ee6ad581ed1e9a99825e5b';
+import { TESTNET } from './testnet.js';
 
 export async function connectHumid(provider) {
   if (typeof provider?.request !== 'function') {
@@ -8,7 +8,7 @@ export async function connectHumid(provider) {
     method: 'wallet_createSession',
     params: {
       optionalScopes: {
-        [TESTNET]: { methods: ['getAddress', 'getBalance'], notifications: [] },
+        [TESTNET]: { methods: ['getAddress', 'getBalance', 'getUTXOs', 'signPset'], notifications: [] },
       },
     },
   });
@@ -26,7 +26,7 @@ export async function disconnectHumid(provider) {
 }
 
 function read(session, method, params) {
-  if (!session.methods.includes(method)) throw Error('Sharing permission was not granted.');
+  if (!session.methods.includes(method)) throw Error('Humid permission for ' + method + ' was not granted. Reconnect and approve it.');
   return session.provider.request({
     method: 'wallet_invokeMethod',
     params: { scope: TESTNET, request: { method, params } },
@@ -50,4 +50,28 @@ export async function readHumidBalance(session, asset) {
     throw Error('Humid did not return a valid Liquid Testnet balance.');
   }
   return BigInt(result.balance);
+}
+
+export async function readHumidCoins(session, asset) {
+  const assetId = TESTNET + '/elip144:' + asset;
+  const result = await read(session, 'getUTXOs', { assetId });
+  if (result?.chainId !== TESTNET || result.assetId !== assetId || !Array.isArray(result.utxos)) {
+    throw Error('Humid did not provide Testnet coins for ' + asset.slice(0, 8) + '….');
+  }
+  // Only send the transaction planner the fields needed for coin selection and signing.
+  return result.utxos.map(({ address, amount, assetId, confidential, spendable, txid, vout }) =>
+    ({ address, amount, assetId, confidential, spendable, txid, vout }));
+}
+
+export async function signHumidPset(session, { pset, signInputs }) {
+  const result = await read(session, 'signPset', { pset, signInputs, broadcast: false });
+  if (typeof result?.pset !== 'string' || !result.pset || result.txid) {
+    throw Error('Humid did not return a signed PSET for finalization.');
+  }
+  return result.pset;
+}
+
+export function popupUnavailable(error) {
+  return [error?.message, error?.data?.message, error?.cause?.message, error]
+    .some(message => typeof message === 'string' && /No handler registered.*requestConfirmation/i.test(message));
 }

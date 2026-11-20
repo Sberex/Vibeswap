@@ -72,3 +72,45 @@ test('TEST displays 702 atomic units as 0.702 and parses the amount exactly', as
   assert.equal(parseAmount('0.00000702', assetPrecision(A)), 702n);
   assert.throws(() => parseAmount('0.7021', assetPrecision(B)), /3 decimal/);
 });
+
+test('accepts Humid’s standard global xpub without dropping input witnesses or output checks', async () => {
+  const plan = await buildPlan({
+    ...base, action: 'create', coins: [
+      { ...coin(A, 7, String(base.amount + FEE)), confidential: false },
+      { ...coin(B, 8, String(base.second)), confidential: false },
+    ],
+  });
+  const signed = Pset.fromBase64(plan.pset.toBase64());
+  const witness = Buffer.from('010101', 'hex');
+  signed.inputs.forEach((input, index) => {
+    input.witnessUtxo = {
+      script: walletScript,
+      asset: AssetHash.fromHex(TESTNET_PAIR[index]).bytes,
+      value: ElementsValue.fromNumber(Number(index ? base.second : base.amount + FEE)).bytes,
+      nonce: Buffer.of(0),
+    };
+    input.finalScriptWitness = witness;
+  });
+
+  // Wire format used by Rust Elements: type byte followed by the raw xpub.
+  const xpub = Buffer.alloc(78);
+  xpub.writeUInt32BE(0x043587cf);
+  xpub.fill(0xaa, 13, 45);
+  blindKey.copy(xpub, 45);
+  const globalEntry = Buffer.concat([Buffer.from([79, 1]), xpub, Buffer.from([4, 0, 0, 0, 0])]);
+  const withXpub = (pset, entry = globalEntry) => {
+    const bytes = Buffer.from(pset.toBase64(), 'base64');
+    return Buffer.concat([bytes.subarray(0, 5), entry, bytes.subarray(5)]).toString('base64');
+  };
+
+  assert.throws(() => Pset.fromBase64(withXpub(signed)), /Invalid xpub length/);
+  const finalized = Pset.fromBase64(acceptWalletSignature(plan, withXpub(signed)));
+  assert.deepEqual(finalized.unsignedTx().toHex(), signed.unsignedTx().toHex());
+  assert.ok(finalized.inputs.every(input => input.finalScriptWitness.equals(witness)));
+
+  const malformed = Buffer.from(globalEntry);
+  malformed[47] = 0;
+  assert.throws(() => acceptWalletSignature(plan, withXpub(signed, malformed)), /invalid global xpub metadata/);
+  signed.outputs[0].value += 1;
+  assert.throws(() => acceptWalletSignature(plan, withXpub(signed)), /changed a transaction output/);
+});
